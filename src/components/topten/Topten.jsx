@@ -53,13 +53,13 @@ function Topten({ data, className }) {
     <div className={`flex flex-col space-y-2 ${className}`}>
       <div className="flex justify-between items-center max-[350px]:flex-col max-[350px]:gap-y-2 max-[350px]:items-start">
         <h1 className="font-bold text-2xl text-white tracking-tight">Top 10</h1>
-        <ul className="flex justify-between w-fit bg-[#1a1a1a] rounded-lg overflow-hidden shadow-lg">
+        <ul className="flex justify-between w-fit bg-[#141417] border border-white/[0.06] p-1 rounded-lg overflow-hidden shadow-lg">
           {["today", "week", "month"].map((period) => (
             <li
               key={period}
-              className={`cursor-pointer p-1.5 px-4 transition-all duration-200 ${activePeriod === period
-                ? "bg-white text-black font-medium"
-                : "text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+              className={`cursor-pointer py-1 px-3.5 text-xs font-semibold rounded-md transition-all duration-200 ${activePeriod === period
+                ? "bg-white text-black shadow-sm"
+                : "text-gray-400 hover:text-white"
                 }`}
               onClick={() => handlePeriodChange(period)}
             >
@@ -69,7 +69,7 @@ function Topten({ data, className }) {
         </ul>
       </div>
 
-      <div className="flex flex-col space-y-3 bg-[#1a1a1a] p-3 pt-6 rounded-lg shadow-lg">
+      <div className="flex flex-col space-y-2.5 bg-[#111113] border border-white/[0.06] p-3.5 pt-5 rounded-xl shadow-xl">
         {currentData &&
           currentData.map((item, index) => (
             <div

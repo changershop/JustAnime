@@ -12,12 +12,12 @@ const Trending = ({ trending, className }) => {
   const { language } = useLanguage();
 
   return (
-    <div className={`bg-[#141414] rounded-lg py-4 px-1.5 ${className}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <FontAwesomeIcon icon={faFire} className="text-white/90" />
-        <h2 className="text-xl font-semibold text-white">Trending Now</h2>
+    <div className={`bg-[#111113] border border-white/[0.06] rounded-xl py-4 px-2.5 shadow-xl ${className}`}>
+      <div className="flex items-center gap-2.5 mb-3 px-2">
+        <FontAwesomeIcon icon={faFire} className="text-amber-400" />
+        <h2 className="text-lg font-bold tracking-tight text-white">Trending Now</h2>
       </div>
-      <div className={`flex flex-col space-y-2 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-[#1a1a1a] scrollbar-thumb-[#2a2a2a] hover:scrollbar-thumb-[#333] scrollbar-thumb-rounded`}>
+      <div className={`flex flex-col space-y-1.5 max-h-[600px] overflow-y-auto pr-1.5 scrollbar-thin scrollbar-track-[#141416] scrollbar-thumb-[#2a2a2e] hover:scrollbar-thumb-[#3a3a40] scrollbar-thumb-rounded`}>
         {trending &&
           trending.map((item, index) => (
             <div key={index} className="group">
