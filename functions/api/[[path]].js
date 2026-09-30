@@ -299,6 +299,68 @@ export async function onRequest(context) {
       return new Response(JSON.stringify({ success: true, results: servers }), { headers });
     }
 
+    if (path === "embed") {
+      const targetUrl = url.searchParams.get("url") || "";
+      if (!targetUrl.startsWith("http")) {
+        return new Response("Invalid embed url", { status: 400 });
+      }
+      const origin = new URL(targetUrl).origin;
+      const r = await fetch(targetUrl, {
+        headers: { Referer: `${ANIKOTO_WEB_URL}/`, "User-Agent": "Mozilla/5.0" },
+      });
+      let html = await r.text();
+      html = html.replace(/<script[^>]*app\.main\.js[^>]*><\/script>/gi, "");
+      html = html.replace(/<script[^>]*statlytic\.net[^>]*><\/script>/gi, "");
+      const headInjection = `<base href="${origin}/"><script>window.SandboxDetector={detect:async()=>false,run:async()=>false,showBlockMessage:()=>{}};</script>`;
+      html = html.replace(/<head>/i, `<head>${headInjection}`);
+      return new Response(html, {
+        headers: { "Content-Type": "text/html; charset=utf-8", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    if (path === "m3u8-proxy") {
+      const targetUrl = url.searchParams.get("url") || "";
+      if (!targetUrl.startsWith("http")) {
+        return new Response("Invalid url", { status: 400 });
+      }
+      const isM3u8 = /\.m3u8(\?|$)/i.test(targetUrl) || /index-[^/]+\.m3u8/i.test(targetUrl);
+      const r = await fetch(targetUrl, {
+        headers: {
+          Referer: "https://megaplay.buzz/",
+          Origin: "https://megaplay.buzz",
+          "User-Agent": "Mozilla/5.0",
+        },
+      });
+      if (isM3u8) {
+        const text = await r.text();
+        const rewritten = text
+          .split(/\r?\n/)
+          .map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#")) return line;
+            try {
+              const abs = new URL(trimmed, targetUrl).href;
+              return `/api/m3u8-proxy?url=${encodeURIComponent(abs)}`;
+            } catch {
+              return line;
+            }
+          })
+          .join("\n");
+        return new Response(rewritten, {
+          headers: {
+            "Content-Type": "application/vnd.apple.mpegurl",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+      }
+      return new Response(r.body, {
+        headers: {
+          "Content-Type": r.headers.get("content-type") || "video/mp2t",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
+
     if (path === "stream") {
       const rawIdParam = url.searchParams.get("id") || "";
       const [animeIdPart, epPart] = rawIdParam.split("?ep=");
@@ -314,13 +376,64 @@ export async function onRequest(context) {
           : server === "hd-2"
             ? ep?.embed_url?.hsub || ep?.embed_url?.sub
             : ep?.embed_url?.sub || ep?.embed_url?.hsub || ep?.embed_url?.dub;
+
+      let directFile = null;
+      let tracks = [];
+      let intro = { start: 0, end: 0 };
+      let outro = { start: 0, end: 0 };
+
+      if (embedUrl && embedUrl.includes("megaplay.buzz")) {
+        try {
+          const origin = new URL(embedUrl).origin;
+          const pageHtml = await fetch(embedUrl, {
+            headers: { Referer: `${ANIKOTO_WEB_URL}/`, "User-Agent": "Mozilla/5.0" },
+          }).then((r) => r.text());
+          const idMatch = pageHtml.match(/data-id="(\d+)"/);
+          if (idMatch) {
+            const srcData = await fetch(`${origin}/stream/getSources?id=${idMatch[1]}`, {
+              headers: { Referer: embedUrl, "X-Requested-With": "XMLHttpRequest" },
+            }).then((r) => r.json());
+            tracks = srcData?.tracks || [];
+            intro = srcData?.intro || intro;
+            outro = srcData?.outro || outro;
+            if (srcData?.enc) {
+              const keyBytes = new Uint8Array(32);
+              keyBytes.set(new TextEncoder().encode("i?LMTAx0Q6,:}50U"));
+              const ivBytes = new TextEncoder().encode("W0;27ToaUpl_P%'c");
+              const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, ["decrypt"]);
+              let b64 = String(srcData.enc).replace(/-/g, "+").replace(/_/g, "/");
+              while (b64.length % 4) b64 += "=";
+              const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+              const decBuf = await crypto.subtle.decrypt({ name: "AES-CBC", iv: ivBytes }, cryptoKey, raw);
+              const decStr = new TextDecoder().decode(decBuf);
+              const parsed = JSON.parse(decStr);
+              directFile = parsed?.file || null;
+            }
+          }
+        } catch (e) {
+          // fallback to safeIframe
+        }
+      }
+
+      const safeIframe = embedUrl ? `/api/embed?url=${encodeURIComponent(embedUrl)}` : null;
       return new Response(
         JSON.stringify({
           success: true,
           results: {
-            streamingLink: [{ id: String(ep?.id || ""), type, link: null, iframe: embedUrl || null, server: "HD-1" }],
+            streamingLink: [
+              {
+                id: String(ep?.id || ""),
+                type,
+                link: directFile ? { file: directFile, type: "hls" } : null,
+                tracks,
+                intro,
+                outro,
+                iframe: safeIframe,
+                server: "HD-1",
+              },
+            ],
             servers: [],
-            tracks: [],
+            tracks,
           },
         }),
         { headers }

@@ -272,10 +272,18 @@ export default function Player({
       // ignore
     }
 
-    const hd1Proxy = import.meta.env.VITE_HD_1_PROXY_URL;
-    const currentProxy = (activeServerName === "HD-1" && hd1Proxy)
-      ? hd1Proxy
-      : m3u8proxy[Math.floor(Math.random() * m3u8proxy?.length)];
+    const rawHd1Proxy = import.meta.env.VITE_HD_1_PROXY_URL;
+    const validHd1Proxy =
+      rawHd1Proxy && !rawHd1Proxy.includes("<") ? rawHd1Proxy : null;
+    const validM3u8Proxies = (m3u8proxy || []).filter(
+      (u) => u && !u.includes("<") && u.trim() !== ""
+    );
+    const currentProxy =
+      activeServerName === "HD-1" && validHd1Proxy
+        ? validHd1Proxy
+        : validM3u8Proxies.length > 0
+          ? validM3u8Proxies[Math.floor(Math.random() * validM3u8Proxies.length)]
+          : "/api/m3u8-proxy?url=";
 
     const art = new Artplayer({
       url:

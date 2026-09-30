@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import axios from "axios";
 import * as cheerio from "cheerio";
+import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
@@ -1050,6 +1051,190 @@ async function startServer() {
   });
 
   // 7. Stream Info: GET /api/stream?id=animeId?ep=episodeId&server=hd-1&type=sub
+  const MEGAPLAY_AES_KEY = (() => {
+    const buf = Buffer.alloc(32);
+    Buffer.from("i?LMTAx0Q6,:}50U").copy(buf);
+    return buf;
+  })();
+  const MEGAPLAY_AES_IV = Buffer.from("W0;27ToaUpl_P%'c");
+
+  function decryptMegaPlayToken(token) {
+    try {
+      let b64 = String(token).replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64.length % 4;
+      if (pad) b64 += "====".slice(pad);
+      const decipher = crypto.createDecipheriv(
+        "aes-256-cbc",
+        MEGAPLAY_AES_KEY,
+        MEGAPLAY_AES_IV
+      );
+      let dec = decipher.update(Buffer.from(b64, "base64"), undefined, "utf8");
+      dec += decipher.final("utf8");
+      return dec;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function extractMegaPlayStream(embedUrl) {
+    if (!embedUrl || !embedUrl.includes("megaplay.buzz")) return null;
+    try {
+      const origin = new URL(embedUrl).origin;
+      const pageRes = await axios.get(embedUrl, {
+        timeout: 10000,
+        headers: {
+          Referer: `${ANIKOTO_WEB_URL}/`,
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+      const html = String(pageRes.data || "");
+      const idMatch = html.match(/id="megaplay-player"[^>]*data-id="(\d+)"/) ||
+                      html.match(/data-id="(\d+)"/);
+      if (!idMatch) return null;
+
+      const dataId = idMatch[1];
+      const srcRes = await axios.get(`${origin}/stream/getSources?id=${dataId}`, {
+        timeout: 10000,
+        headers: {
+          Referer: embedUrl,
+          "X-Requested-With": "XMLHttpRequest",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+      const srcData = srcRes.data;
+      let fileUrl = srcData?.sources?.file || srcData?.sources?.[0]?.file || null;
+
+      if (!fileUrl && srcData?.enc) {
+        const decrypted = decryptMegaPlayToken(srcData.enc);
+        if (decrypted) {
+          try {
+            const parsed = JSON.parse(decrypted);
+            fileUrl = parsed?.file || parsed?.[0]?.file || null;
+          } catch {
+            if (decrypted.startsWith("http")) fileUrl = decrypted;
+          }
+        }
+      }
+
+      if (!fileUrl) return null;
+
+      return {
+        file: fileUrl,
+        tracks: Array.isArray(srcData?.tracks) ? srcData.tracks : [],
+        intro: srcData?.intro || { start: 0, end: 0 },
+        outro: srcData?.outro || { start: 0, end: 0 },
+      };
+    } catch (err) {
+      console.error("[MegaPlay] Failed to extract direct HLS stream:", err.message);
+      return null;
+    }
+  }
+
+  app.get("/api/m3u8-proxy", async (req, res) => {
+    try {
+      const targetUrl = String(req.query.url || "").trim();
+      if (!targetUrl || !targetUrl.startsWith("http")) {
+        return res.status(400).send("Missing or invalid url");
+      }
+
+      const isM3u8 =
+        /\.m3u8(\?|$)/i.test(targetUrl) || /index-[^/]+\.m3u8/i.test(targetUrl);
+
+      const response = await axios.get(targetUrl, {
+        responseType: isM3u8 ? "text" : "arraybuffer",
+        timeout: 15000,
+        headers: {
+          Referer: "https://megaplay.buzz/",
+          Origin: "https://megaplay.buzz",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+
+      res.setHeader("Access-Control-Allow-Origin", "*");
+
+      const contentType = String(response.headers["content-type"] || "");
+      const bodyStr = isM3u8 ? String(response.data) : "";
+
+      if (isM3u8 || bodyStr.trim().startsWith("#EXTM3U")) {
+        const text = isM3u8
+          ? bodyStr
+          : Buffer.from(response.data).toString("utf8");
+
+        const lines = text.split(/\r?\n/);
+        const rewritten = lines
+          .map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return line;
+
+            // Decrypt /segment/<token> if present
+            let processedLine = trimmed.replace(
+              /(?:https?:\/\/[^\s\r\n"]+)?\/segment\/([A-Za-z0-9_-]+)/g,
+              (full, tok) => decryptMegaPlayToken(tok) || full
+            );
+
+            if (processedLine.startsWith("#")) {
+              return processedLine.replace(/URI="([^"]+)"/g, (_, uri) => {
+                try {
+                  const abs = new URL(uri, targetUrl).href;
+                  return `URI="/api/m3u8-proxy?url=${encodeURIComponent(abs)}"`;
+                } catch {
+                  return `URI="${uri}"`;
+                }
+              });
+            }
+
+            try {
+              const absUrl = new URL(processedLine, targetUrl).href;
+              return `/api/m3u8-proxy?url=${encodeURIComponent(absUrl)}`;
+            } catch {
+              return processedLine;
+            }
+          })
+          .join("\n");
+
+        res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+        return res.send(rewritten);
+      }
+
+      res.setHeader("Content-Type", contentType || "video/mp2t");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      return res.send(Buffer.from(response.data));
+    } catch (err) {
+      return res.status(502).send("Proxy error: " + err.message);
+    }
+  });
+
+  app.get("/api/embed", async (req, res) => {
+    try {
+      const targetUrl = String(req.query.url || "").trim();
+      if (!targetUrl || !targetUrl.startsWith("http")) {
+        return res.status(400).send("Invalid embed url");
+      }
+      const origin = new URL(targetUrl).origin;
+      const response = await axios.get(targetUrl, {
+        timeout: 12000,
+        headers: {
+          Referer: `${ANIKOTO_WEB_URL}/`,
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+      let html = String(response.data || "");
+      // Remove app.main.js (which contains the SandboxDetector blocker and popup ads)
+      html = html.replace(/<script[^>]*app\.main\.js[^>]*><\/script>/gi, "");
+      html = html.replace(/<script[^>]*statlytic\.net[^>]*><\/script>/gi, "");
+      // Inject base href and neutralize SandboxDetector
+      const headInjection = `<base href="${origin}/"><script>window.SandboxDetector={detect:async()=>false,run:async()=>false,showBlockMessage:()=>{}};</script>`;
+      html = html.replace(/<head>/i, `<head>${headInjection}`);
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.send(html);
+    } catch (err) {
+      return res.redirect(String(req.query.url || "/"));
+    }
+  });
+
   app.get("/api/stream", async (req, res) => {
     try {
       const rawIdParam = String(req.query.id || "");
@@ -1070,6 +1255,11 @@ async function startServer() {
             ? episode?.embed_url?.hsub || episode?.embed_url?.sub || episode?.embed_url?.dub
             : episode?.embed_url?.sub || episode?.embed_url?.hsub || episode?.embed_url?.dub;
 
+      const directStream = await extractMegaPlayStream(embedUrl);
+      const safeIframe = embedUrl
+        ? `/api/embed?url=${encodeURIComponent(embedUrl)}`
+        : null;
+
       return res.json({
         success: true,
         results: {
@@ -1077,13 +1267,16 @@ async function startServer() {
             {
               id: String(episode?.id || epId || ""),
               type,
-              link: null,
-              iframe: embedUrl || null,
+              link: directStream ? { file: directStream.file, type: "hls" } : null,
+              tracks: directStream?.tracks || [],
+              intro: directStream?.intro || { start: 0, end: 0 },
+              outro: directStream?.outro || { start: 0, end: 0 },
+              iframe: safeIframe,
               server: req.query.server || "HD-1",
             },
           ],
           servers: [],
-          tracks: [],
+          tracks: directStream?.tracks || [],
         },
       });
     } catch (err) {
