@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faClosedCaptioning,
@@ -118,7 +118,10 @@ const CategoryCard = React.memo(
     const { language } = useLanguage();
     const navigate = useNavigate();
 
-    const displayData = limit ? data.slice(0, limit) : data;
+    const displayData = useMemo(() => {
+      if (!Array.isArray(data)) return [];
+      return limit ? data.slice(0, limit) : data;
+    }, [data, limit]);
 
     const [itemsToRender, setItemsToRender] = useState(() => {
       if (categoryPage && window.innerWidth > 758 && displayData.length > 4) {

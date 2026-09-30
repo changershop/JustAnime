@@ -1,11 +1,14 @@
 import axios from "axios";
+import getApiUrl from "./getApiUrl";
 
 const getQtip = async (id) => {
   try {
-    let workerUrls = import.meta.env.VITE_WORKER_URL?.split(",").filter(Boolean);
+    let workerUrls = import.meta.env.VITE_WORKER_URL?.split(",").filter(
+      (u) => u && !u.includes("<")
+    );
     let baseUrl = workerUrls?.length
       ? workerUrls[Math.floor(Math.random() * workerUrls.length)]
-      : import.meta.env.VITE_API_URL || "/api";
+      : getApiUrl();
     const response = await axios.get(`${baseUrl}/qtip/${id.split("-").pop()}`);
     return response.data.results;
   } catch (err) {

@@ -24,6 +24,7 @@
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "hls.js": "^1.5.17",
     "lucide-react": "^0.447.0",

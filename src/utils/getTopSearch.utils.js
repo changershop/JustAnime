@@ -1,11 +1,14 @@
 import axios from "axios";
+import getApiUrl from "./getApiUrl";
 
 const getTopSearch = async () => {
   try {
-    let workerUrls = import.meta.env.VITE_WORKER_URL?.split(",").filter(Boolean);
+    let workerUrls = import.meta.env.VITE_WORKER_URL?.split(",").filter(
+      (u) => u && !u.includes("<")
+    );
     let baseUrl = workerUrls?.length
       ? workerUrls[Math.floor(Math.random() * workerUrls.length)]
-      : import.meta.env.VITE_API_URL || "/api";
+      : getApiUrl();
     const storedData = localStorage.getItem("topSearch");
     if (storedData) {
       const { data, timestamp } = JSON.parse(storedData);
