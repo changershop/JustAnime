@@ -2,8 +2,107 @@
 <html lang="en">
 
 <head>
-  <script data-cfasync="false" async type="text/javascript" src="//be.zebradiomate.com/rOA9aQoberznL0EZ/137307"></script>
-  <script defer src="https://umami.justanime.site/script.js" data-website-id="ccaef8b6-393a-49a3-a7af-16bbcb41ef84"></script>
+  <script>
+    (function () {
+      try {
+        var currentFetch = typeof window.fetch === "function" ? window.fetch.bind(window) : window.fetch;
+        var fetchDescriptor = {
+          configurable: true,
+          enumerable: true,
+          get: function () {
+            return currentFetch;
+          },
+          set: function (fn) {
+            if (typeof fn === "function") {
+              currentFetch = fn;
+            }
+          }
+        };
+        var proto = window;
+        while (proto) {
+          try {
+            var d = Object.getOwnPropertyDescriptor(proto, "fetch");
+            if (d || proto === window || (typeof Window !== "undefined" && proto === Window.prototype)) {
+              Object.defineProperty(proto, "fetch", fetchDescriptor);
+            }
+          } catch (e) {}
+          try {
+            proto = Object.getPrototypeOf(proto);
+          } catch (e) {
+            break;
+          }
+        }
+
+        function patchFetchDescriptor(descriptor) {
+          var patched = Object.assign({}, descriptor, { configurable: true });
+          if ("get" in patched && typeof patched.set !== "function") {
+            var getter = patched.get;
+            var customVal;
+            var hasCustom = false;
+            patched.get = function () {
+              return hasCustom ? customVal : (getter ? getter.call(this) : currentFetch);
+            };
+            patched.set = function (v) {
+              if (typeof v === "function") {
+                customVal = v;
+                hasCustom = true;
+                currentFetch = v;
+              }
+            };
+          } else if ("value" in patched) {
+            if (typeof patched.value === "function") {
+              currentFetch = patched.value;
+            }
+            delete patched.value;
+            delete patched.writable;
+            patched.get = fetchDescriptor.get;
+            patched.set = fetchDescriptor.set;
+          }
+          return patched;
+        }
+
+        var origDefineProperty = Object.defineProperty;
+        Object.defineProperty = function (target, prop, descriptor) {
+          if (
+            prop === "fetch" &&
+            (target === window ||
+              target === globalThis ||
+              (typeof Window !== "undefined" && target === Window.prototype)) &&
+            descriptor &&
+            typeof descriptor === "object"
+          ) {
+            return origDefineProperty.call(Object, target, prop, patchFetchDescriptor(descriptor));
+          }
+          return origDefineProperty.call(Object, target, prop, descriptor);
+        };
+
+        if (typeof Reflect !== "undefined" && Reflect.defineProperty) {
+          var origReflectDefine = Reflect.defineProperty;
+          Reflect.defineProperty = function (target, prop, descriptor) {
+            if (
+              prop === "fetch" &&
+              (target === window ||
+                target === globalThis ||
+                (typeof Window !== "undefined" && target === Window.prototype)) &&
+              descriptor &&
+              typeof descriptor === "object"
+            ) {
+              return origReflectDefine.call(Reflect, target, prop, patchFetchDescriptor(descriptor));
+            }
+            return origReflectDefine.call(Reflect, target, prop, descriptor);
+          };
+        }
+
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
+          }).catch(function () {});
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <link rel="shortcut icon" href="favicon.png" type="image/x-icon" />

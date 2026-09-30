@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const getSearch = async (keyword, page) => {
-  const api_url = import.meta.env.VITE_API_URL;
+  const api_url = import.meta.env.VITE_API_URL || "/api";
   if (!page) page = 1;
   try {
     const response = await axios.get(

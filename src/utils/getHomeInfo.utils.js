@@ -4,17 +4,21 @@ const CACHE_KEY = "homeInfoCache";
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
 export default async function getHomeInfo() {
-  const api_url = import.meta.env.VITE_API_URL;
+  const api_url = import.meta.env.VITE_API_URL || "/api";
 
   const currentTime = Date.now();
   const cachedData = JSON.parse(localStorage.getItem(CACHE_KEY));
 
-  if (cachedData && currentTime - cachedData.timestamp < CACHE_DURATION) {
+  if (
+    cachedData &&
+    cachedData.data?.spotlights?.length > 0 &&
+    currentTime - cachedData.timestamp < CACHE_DURATION
+  ) {
     return cachedData.data;
   }
   const response = await axios.get(`${api_url}`);
   if (
-    !response.data.results ||
+    !response?.data?.results ||
     Object.keys(response.data.results).length === 0
   ) {
     return null;

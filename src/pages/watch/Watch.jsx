@@ -112,6 +112,30 @@ export default function Watch() {
     if (totalEpisodes === 0) navigate(`/${animeId}`);
   }, [animeId, totalEpisodes, navigate]);
 
+  // Save to Continue Watching when watching via iframe embed
+  useEffect(() => {
+    if (!animeInfo?.data_id || !episodeId) return;
+    try {
+      const continueWatching = JSON.parse(localStorage.getItem("continueWatching")) || [];
+      const newEntry = {
+        id: animeInfo.id || animeId,
+        data_id: animeInfo.data_id,
+        episodeId,
+        episodeNum: activeEpisodeNum || 1,
+        adultContent: animeInfo.adultContent,
+        poster: animeInfo.poster,
+        title: animeInfo.title,
+        japanese_title: animeInfo.japanese_title,
+        updatedAt: Date.now(),
+      };
+      const filtered = continueWatching.filter((item) => item.data_id !== newEntry.data_id);
+      filtered.unshift(newEntry);
+      localStorage.setItem("continueWatching", JSON.stringify(filtered.slice(0, 20)));
+    } catch (e) {
+      // ignore storage error
+    }
+  }, [animeInfo, animeId, episodeId, activeEpisodeNum]);
+
   // Height adjustment logic
   const adjustHeight = useCallback(() => {
     if (window.innerWidth > 1200) {
@@ -199,23 +223,34 @@ export default function Watch() {
               <div ref={playerRef} className="player w-full h-fit bg-black flex flex-col rounded-xl overflow-hidden shadow-2xl">
                 <div ref={videoContainerRef} className="w-full relative aspect-video bg-black">
                   {!buffering ? (
-                    <Player
-                      streamUrl={streamUrl}
-                      subtitles={subtitles}
-                      intro={intro}
-                      outro={outro}
-                      activeServerName={activeServerName}
-                      thumbnail={thumbnail}
-                      autoSkipIntro={autoSkipIntro}
-                      autoPlay={autoPlay}
-                      autoNext={autoNext}
-                      episodeId={episodeId}
-                      episodes={episodes}
-                      playNext={setEpisodeId}
-                      animeInfo={animeInfo}
-                      episodeNum={activeEpisodeNum}
-                      streamInfo={streamInfo}
-                    />
+                    streamInfo?.streamingLink?.[0]?.iframe && !streamUrl ? (
+                      <iframe
+                        src={streamInfo.streamingLink[0].iframe}
+                        title={`Episode ${activeEpisodeNum || 1}`}
+                        className="w-full h-full border-0"
+                        allowFullScreen
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                      />
+                    ) : (
+                      <Player
+                        streamUrl={streamUrl}
+                        subtitles={subtitles}
+                        intro={intro}
+                        outro={outro}
+                        activeServerName={activeServerName}
+                        thumbnail={thumbnail}
+                        autoSkipIntro={autoSkipIntro}
+                        autoPlay={autoPlay}
+                        autoNext={autoNext}
+                        episodeId={episodeId}
+                        episodes={episodes}
+                        playNext={setEpisodeId}
+                        animeInfo={animeInfo}
+                        episodeNum={activeEpisodeNum}
+                        streamInfo={streamInfo}
+                      />
+                    )
                   ) : (
                     <div className="absolute inset-0 flex justify-center items-center bg-black bg-opacity-50">
                       <BouncingLoader />

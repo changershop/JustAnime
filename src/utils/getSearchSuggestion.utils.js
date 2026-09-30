@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const getSearchSuggestion = async (keyword) => {
-  const api_url = import.meta.env.VITE_API_URL;
+  const api_url = import.meta.env.VITE_API_URL || "/api";
   try {
     const response = await axios.get(
       `${api_url}/search/suggest?keyword=${keyword}`

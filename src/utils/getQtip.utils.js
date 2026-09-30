@@ -2,11 +2,10 @@ import axios from "axios";
 
 const getQtip = async (id) => {
   try {
-    let workerUrls = import.meta.env.VITE_WORKER_URL?.split(",");
+    let workerUrls = import.meta.env.VITE_WORKER_URL?.split(",").filter(Boolean);
     let baseUrl = workerUrls?.length
       ? workerUrls[Math.floor(Math.random() * workerUrls.length)]
-      : import.meta.env.VITE_API_URL;
-    if (!baseUrl) throw new Error("No API endpoint defined.");
+      : import.meta.env.VITE_API_URL || "/api";
     const response = await axios.get(`${baseUrl}/qtip/${id.split("-").pop()}`);
     return response.data.results;
   } catch (err) {

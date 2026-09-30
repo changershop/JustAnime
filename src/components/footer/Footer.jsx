@@ -17,17 +17,15 @@ function Footer() {
             />
             <div className="flex items-center gap-4 border-l border-white/10 pl-6 h-10">
               <a
-                href="https://discord.gg/P3yqksmGun"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-white/40 hover:text-[#5865F2] transition-all hover:scale-110"
               >
                 <FaDiscord size={28} />
               </a>
               <a
-                href="https://t.me/JustAnimeZone"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-white/40 hover:text-[#26A5E4] transition-all hover:scale-110"
               >
                 <FaTelegram size={28} />

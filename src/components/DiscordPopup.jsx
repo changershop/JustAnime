@@ -70,9 +70,8 @@ const DiscordPopup = () => {
 
                     <div className="mt-6 flex flex-col gap-3">
                         <a
-                            href="https://discord.gg/P3yqksmGun"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href="#"
+                            onClick={(e) => e.preventDefault()}
                             className="flex items-center justify-center gap-2 w-full bg-[#5865F2] hover:bg-[#4759d8] text-white py-2.5 px-4 rounded-xl font-bold transition-all transform active:scale-[0.97] shadow-lg"
                         >
                             <FaDiscord className="text-lg" />
@@ -80,9 +79,8 @@ const DiscordPopup = () => {
                         </a>
 
                         <a
-                            href="https://tinyurl.com/JustAnimeZone"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href="#"
+                            onClick={(e) => e.preventDefault()}
                             className="flex items-center justify-center gap-2 w-full bg-[#26A5E4] hover:bg-[#2295ce] text-white py-2.5 px-4 rounded-xl font-bold transition-all transform active:scale-[0.97] shadow-lg"
                         >
                             <FaTelegram className="text-lg" />

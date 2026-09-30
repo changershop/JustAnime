@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export default async function fetchAnimeInfo(id, random = false) {
-  const api_url = import.meta.env.VITE_API_URL;
+  const api_url = import.meta.env.VITE_API_URL || "/api";
   try {
     if (random) {
       const id = await axios.get(`${api_url}/random/id`);

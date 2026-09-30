@@ -2,9 +2,10 @@ import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
 import { HomeInfoProvider } from "./context/HomeInfoContext";
+
+const Analytics = () => null;
+const SpeedInsights = () => null;
 import Home from "./pages/Home/Home";
 import AnimeInfo from "./pages/animeInfo/AnimeInfo";
 import Navbar from "./components/navbar/Navbar";
